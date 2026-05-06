@@ -4,7 +4,7 @@ const { logger } = require('./logger');
 
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots');
 const LOGIN_URL = 'https://testslanguesub.com/fr?auth=true&type=login';
-const EXAM_URL = 'https://testslanguesub.com/fr/dashboard/exam-registration?step=exam-details&type=TCF-Quebec';
+const EXAM_URL = 'https://testslanguesub.com/fr/dashboard/exam-registration?step=exam-details&type=TCF-Canada';
 const TIMEOUT = 30_000;
 const SHORT_TIMEOUT = 8_000;
 
