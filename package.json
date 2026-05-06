@@ -1,0 +1,17 @@
+{
+  "name": "tcf-bot",
+  "version": "1.0.0",
+  "description": "Robot automatique de réservation TCF",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.42.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

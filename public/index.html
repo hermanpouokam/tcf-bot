@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCF Bot — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <span class="logo-text">TCF<em>bot</em></span>
+      </div>
+      <div class="bot-status-badge" id="botStatusBadge">
+        <span class="status-dot"></span>
+        <span id="botStatusText">Inactif</span>
+      </div>
+    </div>
+    <div class="header-stats" id="headerStats">
+      <div class="hstat"><span id="statTotal">0</span><label>Total</label></div>
+      <div class="hstat"><span id="statPending">0</span><label>En attente</label></div>
+      <div class="hstat"><span id="statProcessing">0</span><label>En cours</label></div>
+      <div class="hstat"><span id="statCompleted">0</span><label>Terminés</label></div>
+      <div class="hstat"><span id="statFailed">0</span><label>Échoués</label></div>
+      <div class="hstat"><span id="statNoExam">0</span><label>Sans exam</label></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-start" id="btnStart" onclick="startBot()">▶ Démarrer</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopBot()" disabled>⏹ Stopper</button>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <main class="layout">
+
+    <!-- LEFT PANEL: Ajout + Filtres + Tableau -->
+    <div class="panel-left">
+
+      <!-- Ajout compte -->
+      <section class="card add-card">
+        <div class="card-title"><span class="card-icon">＋</span> Ajouter un compte</div>
+        <div class="form-row">
+          <input type="email" id="inputEmail" placeholder="email@exemple.com" class="input" />
+          <input type="text" id="inputPassword" placeholder="Mot de passe" class="input" />
+          <button class="btn btn-primary" onclick="addAccount()">Ajouter</button>
+        </div>
+        <div id="addMsg" class="form-msg"></div>
+      </section>
+
+      <!-- Filtres -->
+      <section class="card filters-card">
+        <div class="filters-row">
+          <input type="text" id="searchInput" placeholder="🔍 Rechercher un compte..." class="input search-input" oninput="applyFilters()" />
+
+          <select class="input select" id="filterStatus" onchange="applyFilters()">
+            <option value="all">Tous les statuts</option>
+            <option value="pending">pending</option>
+            <option value="processing">processing</option>
+            <option value="completed">completed</option>
+            <option value="failed">failed</option>
+            <option value="no_exam_found">no_exam_found</option>
+          </select>
+
+          <select class="input select" id="filterDate" onchange="applyFilters()">
+            <option value="">Toutes les dates</option>
+            <option value="today">Aujourd'hui</option>
+            <option value="7days">7 derniers jours</option>
+            <option value="30days">30 derniers jours</option>
+          </select>
+
+          <button class="btn btn-warn" onclick="resetAll()" title="Remettre failed/processing/no_exam_found en pending">↺ Reset non-completed</button>
+        </div>
+      </section>
+
+      <!-- Tableau comptes -->
+      <section class="card table-card">
+        <div class="table-header">
+          <div class="card-title"><span class="card-icon">◈</span> Comptes <span id="accountCount" class="badge">0</span></div>
+        </div>
+        <div class="table-wrapper">
+          <table class="table" id="usersTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Email</th>
+                <th>Statut</th>
+                <th>Créé le</th>
+                <th>Mis à jour</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody">
+              <tr><td colspan="6" class="empty-row">Aucun compte</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT PANEL: Logs -->
+    <div class="panel-right">
+      <section class="card logs-card">
+        <div class="logs-header">
+          <div class="card-title"><span class="card-icon">▸</span> Logs temps réel</div>
+          <button class="btn btn-sm" onclick="clearLogs()">Vider</button>
+        </div>
+        <div class="logs-container" id="logsContainer">
+          <div class="log-entry log-info">
+            <span class="log-ts">--:--:--</span>
+            <span>En attente de démarrage…</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

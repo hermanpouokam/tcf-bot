@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.npm
+database.sqlite
+screenshots/
+logs/
+data/
+.env
+*.tar.gz
+.git
+.gitignore
+README.md
