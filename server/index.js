@@ -34,5 +34,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🤖 TCF Bot démarré sur http://localhost:${PORT}\n`);
+  console.log(`\n TCF Bot démarré sur http://localhost:${PORT}\n`);
 });
