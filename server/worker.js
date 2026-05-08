@@ -93,7 +93,7 @@ async function stepVerifyEnrollment(page, email) {
   await waitPageReady(page);
 
   const row = page.locator('tbody tr').filter({
-    has: page.locator('td', { hasText: 'TCF-Quebec' })
+    has: page.locator('td', { hasText: 'TCF-Canada' })
   }).first();
 
   const hasEnrollment = await row.isVisible().catch(() => false);
@@ -179,22 +179,22 @@ async function stepGoDirectToExam(page, email) {
     const currentValue = (await examDropdown.locator('p').innerText().catch(() => '')).trim();
     logger.info(`[${email}] Type actuel : ${currentValue}`);
 
-    if (currentValue !== 'TCF-Quebec') {
-      logger.info(`[${email}] Sélection de TCF-Quebec`);
+    if (currentValue !== 'TCF-Canada') {
+      logger.info(`[${email}] Sélection de TCF-Canada`);
       await examDropdown.click();
 
-      const option = page.locator('li', { hasText: 'TCF-Quebec' }).first();
+      const option = page.locator('li', { hasText: 'TCF-Canada' }).first();
       await option.waitFor({ state: 'visible', timeout: TIMEOUT });
       await option.click();
 
       await page.waitForFunction(() => {
         return [...document.querySelectorAll('p')]
-          .some(p => p.textContent?.trim() === 'TCF-Quebec');
+          .some(p => p.textContent?.trim() === 'TCF-Canada');
       }, { timeout: TIMEOUT });
 
-      logger.success(`[${email}] TCF-Quebec sélectionné`);
+      logger.success(`[${email}] TCF-Canada sélectionné`);
     } else {
-      logger.success(`[${email}] TCF-Quebec déjà sélectionné`);
+      logger.success(`[${email}] TCF-Canada déjà sélectionné`);
     }
 
 
