@@ -15,7 +15,7 @@ const { processAccount } = require('./worker');
 const { logger } = require('./logger');
 
 const MAX_WORKERS = 1;
-const AUTO_STOP_THRESHOLD = 8; // no_exam_found consécutifs
+const AUTO_STOP_THRESHOLD = 3; // no_exam_found consécutifs
 
 let browser = null;
 let browserContext = null;
@@ -55,7 +55,7 @@ async function startBot() {
   queue = [...users];
 
   // Lancer navigateur
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: false });
   browserContext = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/121.0.0.0 Safari/537.36',
@@ -86,11 +86,33 @@ async function fillWorkers() {
     activeWorkers.add(workerPromise);
   }
 
-  // Si plus rien à traiter et workers terminés → arrêt automatique
   if (queue.length === 0 && activeWorkers.size === 0 && isRunning) {
-    logger.success('Tous les comptes ont été traités. Robot arrêté automatiquement.');
-    await stopBot();
+    await refillQueue();
   }
+}
+
+
+async function refillQueue() {
+  logger.info('Cycle terminé — vérification des comptes restants...');
+
+  // await new Promise(resolve => setTimeout(resolve, 10000));
+
+  const remainingUsers = getPendingUsers();
+
+  if (remainingUsers.length === 0) {
+    logger.success('Tous les comptes sont completed 🎉');
+    await stopBot();
+    return;
+  }
+
+  logger.info(
+    `${remainingUsers.length} compte(s) non completed détecté(s) — nouveau cycle`
+  );
+
+  queue = [...remainingUsers];
+  consecutiveNoExam = 0;
+
+  await fillWorkers();
 }
 
 /**
@@ -135,7 +157,7 @@ async function stopBot() {
 
   // Fermer le navigateur
   if (browser) {
-    await browser.close().catch(() => {});
+    await browser.close().catch(() => { });
     browser = null;
     browserContext = null;
   }

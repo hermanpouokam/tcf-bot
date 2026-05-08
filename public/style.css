@@ -35,6 +35,11 @@ html, body {
   line-height: 1.5;
 }
 
+/* Mobile : pas de height fixe, scroll naturel */
+@media (max-width: 1023px) {
+  html, body { height: auto; min-height: 100%; }
+}
+
 /* ── HEADER ──────────────────────────────────────────── */
 
 .header {
@@ -510,12 +515,170 @@ html, body {
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 
-/* ── RESPONSIVE ──────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE
+   Breakpoints :
+     lg  : ≥ 1024px  → layout 2 colonnes (défaut)
+     md  : < 1024px  → layout 1 colonne, logs en bas
+     sm  : < 640px   → mobile, tout en colonne
+   ══════════════════════════════════════════════════════ */
 
-@media (max-width: 1024px) {
-  .layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 400px;
+/* ── Tablette (< 1024px) ─────────────────────────────── */
+@media (max-width: 1023px) {
+
+  /* Header : stats cachées, tout sur une ligne compacte */
+  .header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 16px;
   }
   .header-stats { display: none; }
+  .header-left  { flex: 1; }
+
+  /* Layout : 1 colonne, hauteur auto (scroll naturel) */
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    height: auto;
+    overflow: visible;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  /* Panels : scroll auto sur chacun */
+  .panel-left  { overflow-y: visible; }
+  .panel-right { overflow: visible; }
+
+  /* Logs : hauteur fixe raisonnable sur tablette */
+  .logs-card      { height: 380px; }
+  .logs-container { flex: 1; }
+
+  /* Table : scroll horizontal si nécessaire */
+  .table-wrapper { overflow-x: auto; }
+  .table-card    { overflow: hidden; }
+}
+
+/* ── Mobile (< 640px) ────────────────────────────────── */
+@media (max-width: 639px) {
+
+  /* Header compact */
+  .header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .logo-text    { font-size: 15px; }
+  .logo-icon    { font-size: 18px; }
+  .header-left  { gap: 10px; }
+  .bot-status-badge { font-size: 11px; padding: 3px 8px; }
+
+  /* Boutons header plus petits */
+  .header-actions .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Layout */
+  .layout { padding: 8px 12px; gap: 8px; }
+
+  /* Form rows : colonne sur mobile */
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Exceptions : certains form-row restent en ligne */
+  .header-actions { flex-direction: row; }
+  .actions-cell   { flex-direction: row; }
+
+  /* Date input : pleine largeur */
+  .input[style*="flex:0 0 160px"],
+  #inputPaymentDate {
+    flex: 1 !important;
+    width: 100% !important;
+  }
+
+  /* Bouton fichier : pleine largeur */
+  .btn-file { width: 100%; text-align: center; }
+
+  /* Filtres : wrap */
+  .filters-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .filters-row .input  { min-width: 100%; }
+  .filters-row .select { min-width: calc(50% - 3px); flex: 1; }
+  .filters-row .btn-warn {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Table : colonnes moins importantes cachées */
+  .table th:nth-child(4),
+  .table td:nth-child(4),
+  .table th:nth-child(5),
+  .table td:nth-child(5) {
+    display: none;
+  }
+
+  /* Email tronqué */
+  .email-cell { max-width: 130px; }
+
+  /* Status tag plus compact */
+  .status-tag { font-size: 10px; padding: 1px 5px; }
+
+  /* Logs */
+  .logs-card      { height: 300px; }
+  .logs-container { font-size: 10.5px; }
+
+  /* Cards padding réduit */
+  .card { padding: 12px; }
+}
+
+/* ── Très petit mobile (< 380px) ─────────────────────── */
+@media (max-width: 379px) {
+  .header-actions .btn span:first-child { display: none; }
+  .email-cell { max-width: 100px; }
+  .filters-row .select { min-width: 100%; }
+}
+
+/* ── RECEIPT SECTION ─────────────────────────────────────────── */
+
+.receipt-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-title {
+  font-size: 12px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.btn-file {
+  flex: 0 0 auto;
+  background: rgba(168,85,247,0.1);
+  border-color: var(--purple);
+  color: var(--purple);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+.btn-file:hover {
+  background: rgba(168,85,247,0.2);
+}
+
+.file-label-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--purple);
+  min-height: 16px;
+  padding-left: 4px;
 }

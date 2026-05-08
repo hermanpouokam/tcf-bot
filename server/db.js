@@ -23,7 +23,11 @@ function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
+      status TEXT DEFAULT 'pending', -- pending | processing | completed | failed | no_exam_found | pending_confirm
+      receipt_path TEXT,
+      transaction_id TEXT,
+      payment_date TEXT,
+      sender_name TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME
     );
@@ -66,8 +70,8 @@ function getAllUsers({ search = '', status = '', dateRange = '' } = {}) {
 
 function getPendingUsers() {
   return getDb()
-    .prepare(`SELECT * FROM users WHERE status NOT IN ('completed') ORDER BY created_at ASC`)
-    .all();
+     .prepare(`SELECT * FROM users WHERE status IN ('pending', 'processing', 'failed', 'no_exam_found', 'pending_confirm') ORDER BY created_at ASC`)
+     .all();
 }
 
 function updateStatus(id, status) {
@@ -85,13 +89,24 @@ function resetNonCompleted() {
     .prepare(`
       UPDATE users
       SET status = 'pending', updated_at = CURRENT_TIMESTAMP
-      WHERE status IN ('failed', 'processing', 'no_exam_found')
+      WHERE status IN ('failed', 'processing', 'no_exam_found', 'pending_confirm')
     `)
     .run();
 }
 
 function deleteUser(id) {
   getDb().prepare(`DELETE FROM users WHERE id = ?`).run(id);
+}
+
+function updateReceiptInfo(id, { receiptPath, transactionId, paymentDate, senderName }) {
+  getDb()
+    .prepare(`
+      UPDATE users
+      SET receipt_path = ?, transaction_id = ?, payment_date = ?, sender_name = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `)
+    .run(receiptPath, transactionId, paymentDate, senderName, id);
 }
 
 function getStats() {
@@ -110,6 +125,16 @@ function getStats() {
   return row;
 }
 
+function resetPendingConfirm() {
+  getDb()
+    .prepare(`
+      UPDATE users
+      SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+      WHERE status = 'pending_confirm'
+    `)
+    .run();
+}
+
 module.exports = {
   getDb,
   addUser,
@@ -119,5 +144,7 @@ module.exports = {
   resetUser,
   resetNonCompleted,
   deleteUser,
+  updateReceiptInfo,
   getStats,
+  resetPendingConfirm,
 };

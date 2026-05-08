@@ -48,7 +48,23 @@
         <div class="form-row">
           <input type="email" id="inputEmail" placeholder="email@exemple.com" class="input" />
           <input type="password" id="inputPassword" placeholder="Mot de passe" class="input" />
-          <button class="btn btn-primary" onclick="addAccount()">Ajouter</button>
+        </div>
+        <!-- Infos reçu de paiement -->
+        <div class="receipt-section">
+          <div class="receipt-title">🧾 Reçu de paiement</div>
+          <div class="form-row">
+            <input type="text" id="inputTransactionId" placeholder="ID de transaction" class="input" />
+            <input type="date" id="inputPaymentDate" class="input" style="flex:0 0 160px" />
+          </div>
+          <div class="form-row">
+            <input type="text" id="inputSenderName" placeholder="Nom de l'expéditeur" class="input" />
+            <label class="btn btn-file" for="inputReceiptFile">📎 Reçu (PDF/IMG)</label>
+            <input type="file" id="inputReceiptFile" accept="image/*,application/pdf" style="display:none" onchange="updateFileLabel(this)" />
+          </div>
+          <div id="fileLabel" class="file-label-text"></div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <button class="btn btn-primary" style="width:100%" onclick="addAccount()">Ajouter le compte</button>
         </div>
         <div id="addMsg" class="form-msg"></div>
       </section>

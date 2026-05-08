@@ -9,7 +9,7 @@ const fs = require('fs');
 const routes = require('./routes');
 const { getDb } = require('./db');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Créer dossiers nécessaires
 ['logs', 'screenshots'].forEach((dir) => {
@@ -34,5 +34,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n TCF Bot démarré sur http://localhost:${PORT}\n`);
+  console.log(`\n🤖 TCF Bot démarré sur http://localhost:${PORT}\n`);
 });

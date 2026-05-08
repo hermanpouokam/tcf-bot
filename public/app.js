@@ -153,9 +153,15 @@ function applyFilters() {
 }
 
 async function addAccount() {
-  const email    = document.getElementById('inputEmail').value.trim();
-  const password = document.getElementById('inputPassword').value;
-  const msgEl    = document.getElementById('addMsg');
+  const email         = document.getElementById('inputEmail').value.trim();
+  const password      = document.getElementById('inputPassword').value;
+  const transactionId = document.getElementById('inputTransactionId').value.trim();
+  const paymentDate   = document.getElementById('inputPaymentDate').value;
+  const senderName    = document.getElementById('inputSenderName').value.trim();
+  const receiptFile   = document.getElementById('inputReceiptFile').files[0];
+  console.log('DEBUG receipt:', receiptFile, transactionId, paymentDate, senderName);
+
+  const msgEl         = document.getElementById('addMsg');
 
   if (!email || !password) {
     showMsg(msgEl, 'error', 'Email et mot de passe requis');
@@ -163,14 +169,50 @@ async function addAccount() {
   }
 
   try {
-    await api('POST', '/api/users', { email, password });
-    showMsg(msgEl, 'success', `✓ Compte ajouté : ${email}`);
-    document.getElementById('inputEmail').value    = '';
-    document.getElementById('inputPassword').value = '';
+    // 1. Créer le compte
+    const result = await api('POST', '/api/users', { email, password });
+    const userId = result.id;
+
+    // 2. Uploader le reçu si fourni
+    if (receiptFile) {
+      const formData = new FormData();
+      formData.append('receipt', receiptFile);
+      formData.append('transactionId', transactionId);
+      formData.append('paymentDate', paymentDate);
+      formData.append('senderName', senderName);
+
+      const res = await fetch(`/api/users/${userId}/receipt`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showMsg(msgEl, 'warn', `Compte créé mais reçu non enregistré : ${err.error}`);
+        loadUsers();
+        return;
+      }
+      showMsg(msgEl, 'success', `✓ Compte + reçu ajoutés : ${email}`);
+    } else {
+      showMsg(msgEl, 'success', `✓ Compte ajouté : ${email} (sans reçu)`);
+    }
+
+    // 3. Vider le formulaire
+    document.getElementById('inputEmail').value         = '';
+    document.getElementById('inputPassword').value      = '';
+    document.getElementById('inputTransactionId').value = '';
+    document.getElementById('inputPaymentDate').value   = '';
+    document.getElementById('inputSenderName').value    = '';
+    document.getElementById('inputReceiptFile').value   = '';
+    document.getElementById('fileLabel').textContent    = '';
     loadUsers();
   } catch (err) {
     showMsg(msgEl, 'error', err.message);
   }
+}
+
+function updateFileLabel(input) {
+  const label = document.getElementById('fileLabel');
+  label.textContent = input.files[0] ? `📎 ${input.files[0].name}` : '';
 }
 
 async function deleteAccount(id, email) {
