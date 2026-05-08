@@ -9,7 +9,7 @@ const fs = require('fs');
 const routes = require('./routes');
 const { getDb } = require('./db');
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // Créer dossiers nécessaires
 ['logs', 'screenshots'].forEach((dir) => {
