@@ -96,7 +96,7 @@ async function stepLogin(page, email, password) {
   await loginBtn.waitFor({ state: 'visible', timeout: TIMEOUT });
   await loginBtn.dispatchEvent('click');
 
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(30000);
 
   const errorVisible = await page
     .locator('text=Détails de connexion invalides')
