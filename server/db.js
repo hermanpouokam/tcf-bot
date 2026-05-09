@@ -4,7 +4,7 @@
 const { DatabaseSync: Database } = require('node:sqlite');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, '..', 'database.sqlite');
+const DB_PATH = path.join(process.cwd(), 'data', 'database.sqlite');
 
 let db;
 
@@ -23,7 +23,7 @@ function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
-      status TEXT DEFAULT 'pending', -- pending | processing | completed | failed | no_exam_found | pending_confirm
+      status TEXT DEFAULT 'pending', -- pending | processing | completed | failed | no_exam_found | pending_confirm | waiting_receipt
       receipt_path TEXT,
       transaction_id TEXT,
       payment_date TEXT,
@@ -70,7 +70,7 @@ function getAllUsers({ search = '', status = '', dateRange = '' } = {}) {
 
 function getPendingUsers() {
   return getDb()
-     .prepare(`SELECT * FROM users WHERE status IN ('pending', 'processing', 'failed', 'no_exam_found', 'pending_confirm') ORDER BY created_at ASC`)
+     .prepare(`SELECT * FROM users WHERE status IN ('pending', 'processing', 'failed', 'no_exam_found', 'pending_confirm', 'waiting_receipt') ORDER BY created_at ASC`)
      .all();
 }
 
@@ -89,7 +89,7 @@ function resetNonCompleted() {
     .prepare(`
       UPDATE users
       SET status = 'pending', updated_at = CURRENT_TIMESTAMP
-      WHERE status IN ('failed', 'processing', 'no_exam_found', 'pending_confirm')
+      WHERE status IN ('failed', 'processing', 'no_exam_found', 'pending_confirm', 'waiting_receipt')
     `)
     .run();
 }

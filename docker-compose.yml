@@ -8,8 +8,6 @@ services:
     volumes:
       # Persistance de la base de données SQLite
       - ./data:/app/data
-      # Persistance des screenshots d'erreurs
-      - ./data/screenshots:/app/screenshots
       # Persistance des logs
       - ./data/logs:/app/logs
     environment:

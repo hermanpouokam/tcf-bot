@@ -3,21 +3,11 @@ const fs = require('fs');
 const { updateStatus } = require('./db');
 const { logger } = require('./logger');
 
-const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots');
 const RECEIPTS_DIR = path.join(__dirname, '..', 'receipts');
 const LOGIN_URL = 'https://testslanguesub.com/fr?auth=true&type=login';
 const TIMEOUT = 30000;
 
 // ── Utilitaires ────────────────────────────────────────────────────────────
-
-async function screenshot(page, name) {
-  try {
-    const safe = name.replace(/[^a-z0-9_\-]/gi, '_');
-    const file = path.join(SCREENSHOTS_DIR, `${safe}-${Date.now()}.png`);
-    await page.screenshot({ path: file, fullPage: true });
-    logger.warn(`Screenshot : ${path.basename(file)}`);
-  } catch (_) { }
-}
 
 async function waitVisible(page, selector, timeout = TIMEOUT) {
   await page.waitForSelector(selector, { state: 'visible', timeout });
@@ -51,15 +41,19 @@ async function ensureOnExamPage(page, email, password) {
   const currentUrl = page.url();
   logger.info(`[${email}] URL actuelle : ${currentUrl}`);
 
+  // Cas 0 : déjà inscrit → upload-receipt
   if (currentUrl.includes('step=upload-receipt')) {
+    logger.success(`[${email}] Déjà inscrit → upload-receipt`);
     throw new Error('GOTO_UPLOAD');
   }
 
+  // Cas 1 : déjà sur la bonne page
   if (currentUrl.includes('exam-registration') && currentUrl.includes('step=exam-details')) {
     logger.success(`[${email}] Déjà sur la page examen ✓`);
     return;
   }
 
+  // Cas 2 : redirigé vers la page de connexion
   const isLoginPage =
     currentUrl.includes('auth=true') ||
     currentUrl.includes('type=login') ||
@@ -72,7 +66,8 @@ async function ensureOnExamPage(page, email, password) {
     return;
   }
 
-  logger.warn(`[${email}] Page inattendue (${currentUrl}) — redirection`);
+  // Cas 3 : page inattendue → forcer navigation
+  logger.warn(`[${email}] Page inattendue (${currentUrl}) — redirection forcée`);
   await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: TIMEOUT });
   const hasLoginForm = await page.locator('input[type="email"]').isVisible().catch(() => false);
   if (hasLoginForm) await stepLogin(page, email, password);
@@ -166,7 +161,6 @@ async function stepGoDirectToExam(page, email) {
 
   // CAS 2 : sur personal-information → sélectionner type examen
   if (urlAfter.includes('personal-information')) {
-
     await waitVisible(page, "text=Type d'examen");
 
     const examDropdown = page
@@ -197,40 +191,19 @@ async function stepGoDirectToExam(page, email) {
       logger.success(`[${email}] TCF-Canada déjà sélectionné`);
     }
 
-
-    // ── continuer ────────────────────────────────────
     const continueBtn = page.locator('button:has-text("Continuer")').first();
-
     await continueBtn.waitFor({ state: 'visible', timeout: TIMEOUT });
     await continueBtn.click();
 
-    // Détecter ce qui apparaît après la sélection
-    const nextStep = await waitForOneOf(page, [
-      "text=Détails de l'examen",
-      'text=Télécharger le reçu',
-    ]);
+    // Attendre stabilisation et vérifier via URL (plus fiable que du texte)
+    await page.waitForTimeout(1500);
 
-    if (nextStep === 'text=Télécharger le reçu') {
-      logger.success(`[${email}] Déjà inscrit → upload-receipt`);
+    if (page.url().includes('step=upload-receipt')) {
+      logger.success(`[${email}] Déjà inscrit après continuer → upload-receipt`);
       throw new Error('GOTO_UPLOAD');
     }
 
-    if (nextStep === "text=Détails de l'examen") {
-      logger.success(`[${email}] Page examen chargée directement`);
-      return;
-    }
-
-
-    const destination = await waitForOneOf(page, [
-      "text=Détails de l'examen",
-      'text=Télécharger le reçu',
-    ]);
-
-    if (destination === 'text=Télécharger le reçu') {
-      logger.success(`[${email}] Redirigé vers upload-receipt après continuer`);
-      throw new Error('GOTO_UPLOAD');
-    }
-
+    await waitVisible(page, "text=Détails de l'examen");
     logger.success(`[${email}] Page examen chargée`);
     return;
   }
@@ -247,101 +220,118 @@ async function stepSelectDate(page, email, password) {
   await ensureOnExamPage(page, email, password);
   await waitPageReady(page);
 
-  const noExam = await page.locator('text=Aucun examen programmé').isVisible().catch(() => false);
-  if (noExam) {
+  // Check upload-receipt après restauration de page
+  if (page.url().includes('step=upload-receipt')) {
+    throw new Error('GOTO_UPLOAD');
+  }
+
+  // Indicateur fiable de rendu React : inputs disabled (dates dispo) ou message sans dates
+  const pageState = await waitForOneOf(page, [
+    'input[placeholder="Date limite d\'inscription"]',
+    'p:has-text("Aucun examen programmé")',
+  ]);
+
+  if (pageState === 'p:has-text("Aucun examen programmé")') {
     logger.warn(`[${email}] Aucun examen programmé`);
     return false;
   }
 
-  await waitVisible(page, "text=Détails de l'examen");
+  logger.info(`[${email}] Dates disponibles détectées`);
 
-  // Sélectionner la première date
-  logger.info(`[${email}] Sélection de la première date`);
+  // Ouvrir le dropdown de date
+  const dropdownTrigger = page
+    .locator('div.relative.border.cursor-pointer.rounded')
+    .first();
 
-  const dropdownTrigger = page.locator('div.relative.border.cursor-pointer.rounded').first();
   await dropdownTrigger.waitFor({ state: 'visible', timeout: TIMEOUT });
   await dropdownTrigger.click({ force: true });
 
-  await waitVisible(page, 'div.relative.border.cursor-pointer.rounded ul li');
+  // Attendre que les options chargent
+  await page.waitForTimeout(1500);
 
   const dateOptions = dropdownTrigger.locator('ul li');
-  const dateCount = await dateOptions.count();
+  const dateCount = await dateOptions.count().catch(() => 0);
 
   if (dateCount === 0) {
-    logger.warn(`[${email}] Aucune date dans le dropdown`);
+    logger.warn(`[${email}] Dropdown ouvert mais aucune date`);
+    await page.keyboard.press('Escape').catch(() => { });
     return false;
   }
 
-  const firstDate = await dateOptions.first().innerText();
+  const firstDate = await dateOptions.first().innerText().catch(() => '?');
   await dateOptions.first().click({ force: true });
+  logger.success(`[${email}] Date choisie : ${firstDate.trim()}`);
 
+  // Attendre fermeture dropdown
   await page.waitForSelector('div.relative.border.cursor-pointer.rounded ul', {
     state: 'hidden',
     timeout: 5000
   }).catch(() => { });
 
-  const urlAfter = page.url();
-  logger.info(`[${email}] URL après stabilisation : ${urlAfter}`);
-
-  // CAS 1 : déjà inscrit → upload-receipt
-  if (urlAfter.includes('step=upload-receipt')) {
-    logger.success(`[${email}] Déjà inscrit → upload-receipt`);
+  // Vérifier redirection après sélection de date
+  await page.waitForTimeout(1000);
+  if (page.url().includes('step=upload-receipt')) {
+    logger.success(`[${email}] Redirigé vers upload-receipt après sélection date`);
     throw new Error('GOTO_UPLOAD');
   }
 
-  logger.success(`[${email}] Date choisie : ${firstDate.trim()}`);
-
-  // Sélectionner les 4 modules
-  logger.info(`[${email}] Sélection des 4 modules`);
-
+  // ── Sélectionner les modules ─────────────────────────────────────────────
+  logger.info(`[${email}] Sélection des modules`);
   await waitVisible(page, 'article');
 
   const moduleCards = page.locator('article');
   const moduleCount = await moduleCards.count();
 
-  if (moduleCount < 4) throw new Error(`Modules insuffisants (${moduleCount})`);
+  if (moduleCount === 0) throw new Error('Aucun module trouvé');
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < moduleCount; i++) {
     const card = moduleCards.nth(i);
     const title = await card.locator('h2').innerText().catch(() => `Module ${i + 1}`);
     const selectBtn = card.locator('div.cursor-pointer').filter({ hasText: 'Select' }).first();
-    await selectBtn.waitFor({ state: 'visible', timeout: TIMEOUT });
+
+    const btnVisible = await selectBtn.isVisible().catch(() => false);
+    if (!btnVisible) {
+      logger.info(`[${email}] Module ${title} déjà sélectionné`);
+      continue;
+    }
+
     await selectBtn.click({ force: true });
 
     await page.waitForFunction(
       (idx) => {
         const cards = document.querySelectorAll('article');
         const card = cards[idx];
-        if (!card) return false;
+        if (!card) return true;
         const btn = card.querySelector('div[class*="cursor-pointer"]');
-        return btn && !btn.textContent.includes('Select');
+        return !btn || !btn.textContent.includes('Select');
       },
       i,
-      { timeout: 100 }
+      { timeout: 500 }
     ).catch(() => { });
 
     logger.success(`[${email}] Module : ${title}`);
   }
 
-
-
-  // Vérifier le prix total
-  await page.waitForFunction(() => {
-    const allP = Array.from(document.querySelectorAll('p'));
-    const priceEl = allP.find(p => p.textContent.includes('Prix:'));
-    if (!priceEl) return false;
-    const text = priceEl.textContent.trim();
-    return text.includes('XAF') && text !== 'Prix:  XAF';
-  }, { timeout: TIMEOUT });
-
+  // ── Vérifier le prix ─────────────────────────────────────────────────────
+  await page.waitForTimeout(1000);
   const priceText = await page.locator('p:has-text("Prix:")').first().innerText().catch(() => '');
-  logger.success(`[${email}] Prix : ${priceText}`);
+  if (priceText.includes('XAF') && priceText.trim() !== 'Prix:  XAF') {
+    logger.success(`[${email}] Prix : ${priceText}`);
+  } else {
+    logger.warn(`[${email}] Prix non calculé`);
+  }
 
-  // Cliquer Continuer
-  logger.info(`[${email}] Clic sur Continuer`);
+  // ── Continuer ────────────────────────────────────────────────────────────
   const continuerBtn = page.locator('button:has-text("Continuer")').first();
   await continuerBtn.waitFor({ state: 'visible', timeout: TIMEOUT });
   await continuerBtn.click({ force: true });
+
+  // Vérifier redirection après clic Continuer
+  await page.waitForTimeout(1500);
+  if (page.url().includes('step=upload-receipt')) {
+    logger.success(`[${email}] Redirigé vers upload-receipt après Continuer`);
+    throw new Error('GOTO_UPLOAD');
+  }
 
   await waitForOneOf(page, [
     'button:has-text("Reserver ma place")',
@@ -356,10 +346,10 @@ async function stepSelectDate(page, email, password) {
 
 async function stepSaveDetailsAndContinue(page, email) {
   logger.info(`[${email}] Étape 4 : Réserver ma place`);
-  const urlAfter = page.url();
-  logger.info(`[${email}] URL après stabilisation : ${urlAfter}`);
 
-  // CAS 1 : déjà inscrit → upload-receipt
+  const urlAfter = page.url();
+  logger.info(`[${email}] URL : ${urlAfter}`);
+
   if (urlAfter.includes('step=upload-receipt')) {
     logger.success(`[${email}] Déjà inscrit → upload-receipt`);
     throw new Error('GOTO_UPLOAD');
@@ -392,7 +382,7 @@ async function confirmReservation(page, email) {
       url => url.href.includes('step=upload-receipt'),
       { timeout: TIMEOUT }
     );
-    logger.success(`[${email}] Réservation validée`);
+    logger.success(`[${email}] Réservation validée → upload-receipt`);
   } catch (_) {
     throw new Error(`RESERVATION_CONFIRMATION_FAILED (${page.url()})`);
   }
@@ -419,41 +409,96 @@ async function stepUploadReceipt(page, email, user) {
     return;
   }
 
-  // Attendre la page upload
-  await waitVisible(page, 'input#upload');
+  // Tenter la soumission avec 1 retry
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    logger.info(`[${email}] Tentative ${attempt}/2`);
 
-  // Upload le fichier
-  await page.locator('input#upload').setInputFiles(receiptFile);
-  logger.success(`[${email}] Fichier uploadé`);
+    try {
+      const success = await trySubmitReceipt(page, email, user, receiptFile);
 
-  // Attendre que les champs soient disponibles
+      if (success) {
+        logger.success(`[${email}] ✅ Inscription terminée !`);
+        return;
+      }
+
+      if (attempt === 1) {
+        logger.warn(`[${email}] Soumission échouée — retry dans 1s`);
+        await page.waitForTimeout(1000);
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+        await waitVisible(page, 'input#upload');
+      } else {
+        logger.error(`[${email}] 2 tentatives échouées → remis en waiting_receipt`);
+        throw new Error('UPLOAD_FAILED_RETRY');
+      }
+
+    } catch (err) {
+      if (err.message === 'UPLOAD_FAILED_RETRY') throw err;
+      if (attempt === 1) {
+        logger.warn(`[${email}] Erreur tentative 1 : ${err.message} — retry`);
+        await page.waitForTimeout(3000);
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+        await waitVisible(page, 'input#upload');
+      } else {
+        logger.error(`[${email}] Erreur tentative 2 : ${err.message} → pending`);
+        throw new Error('UPLOAD_FAILED_RETRY');
+      }
+    }
+  }
+}
+
+// ── Sous-fonction : une tentative de soumission ────────────────────────────
+
+async function trySubmitReceipt(page, email, user, receiptFile) {
+
+  // Remplir les champs AVANT l'upload (après upload ils deviennent disabled)
   await waitVisible(page, 'input[name="transactionID"]');
-
   await page.locator('input[name="transactionID"]').fill(user.transaction_id);
   await page.locator('input[name="paymentDate"]').fill(user.payment_date);
   await page.locator('input[name="senderName"]').fill(user.sender_name);
+  logger.info(`[email] Champs remplis`);
 
-  // ── Cibler le bouton S'inscrire DANS le formulaire uniquement ──
-  // (évite le conflit avec le bouton S'inscrire du header)
+  // Uploader le fichier
+  await page.locator('input#upload').setInputFiles(receiptFile);
+  logger.success(`[${email}] Fichier uploadé`);
+
+  // Attendre le preview du fichier (confirmation upload OK)
+  await waitVisible(page, 'div.p-\\[24px\\].rounded-\\[8px\\].bg-neutral-shade-12');
+  logger.info(`[${email}] Preview fichier confirmé`);
+
+  // Cliquer S'inscrire
   const submitBtn = page.locator('form button:has-text("S\'inscrire")').first();
   await submitBtn.waitFor({ state: 'visible', timeout: TIMEOUT });
-  await submitBtn.click({ force: true });
 
-  logger.info(`[${email}] Soumission en cours...`);
+  await Promise.all([
+    page.waitForURL('**/*', { timeout: TIMEOUT }).catch(() => { }),
+    submitBtn.click({ force: true }),
+  ]);
 
-  // Attendre que le bouton Annuler disparaisse (soumission en cours)
-  await page.waitForSelector('button:has-text("Annuler")', {
-    state: 'hidden',
-    timeout: 10000
-  }).catch(() => { });
+  // Attendre fin du chargement (spinner disparu)
+  await page.waitForFunction(() => {
+    const spinner = document.querySelector('.zloader_rotation__ZhZG4');
+    return !spinner;
+  }, { timeout: TIMEOUT }).catch(() => { });
 
+  logger.info(`[${email}] Chargement terminé — URL : ${page.url()}`);
 
-  // Puis attendre soit sa réapparition soit un changement de page
-  await waitForOneOf(page, [
-    'text=Inscription terminée !',
-  ]).catch(() => { });
+  // Vérifier le résultat
+  const success = await page
+    .locator('text=Inscription terminée !')
+    .isVisible()
+    .catch(() => false);
 
-  logger.success(`[${email}] ✅ Reçu soumis — en attente confirmation`);
+  if (success) return true;
+
+  // Vérifier si on est toujours sur upload-receipt (échec silencieux)
+  if (page.url().includes('step=upload-receipt')) {
+    logger.warn(`[${email}] Toujours sur la page upload → échec`);
+    return false;
+  }
+
+  // Autre page → considérer comme succès (redirection inattendue)
+  logger.warn(`[${email}] Page inattendue après soumission : ${page.url()}`);
+  return true;
 }
 
 // ── Entrée principale ──────────────────────────────────────────────────────
@@ -484,14 +529,22 @@ async function processAccount(context, user) {
         logger.success(`[${email}] ✅ Inscription confirmée → completed`);
         return 'completed';
       } else {
-        updateStatus(id, 'pending');
-        logger.warn(`[${email}] Inscription non trouvée → remis en pending`);
-        return 'pending';
+        updateStatus(id, 'waiting_receipt');
+        logger.warn(`[${email}] Inscription non trouvée → remis en waiting_receipt`);
+        return 'waiting_receipt';
       }
     }
 
     // Flux normal
     await stepGoDirectToExam(page, email);
+
+    // Vérifier si déjà redirigé vers upload-receipt après navigation
+    if (page.url().includes('step=upload-receipt')) {
+      logger.success(`[${email}] ✅ Déjà inscrit après navigation → upload reçu`);
+      await stepUploadReceipt(page, email, user);
+      updateStatus(id, 'pending_confirm');
+      return 'pending_confirm';
+    }
 
     const dateFound = await stepSelectDate(page, email, password);
     if (!dateFound) {
@@ -502,7 +555,7 @@ async function processAccount(context, user) {
 
     await stepSaveDetailsAndContinue(page, email);
     await confirmReservation(page, email);
-    await stepUploadReceipt(page, email, user);  // ← appelé UNE SEULE FOIS
+    await stepUploadReceipt(page, email, user);
 
     updateStatus(id, 'pending_confirm');
     logger.success(`[${email}] 📋 pending_confirm — vérification au prochain passage`);
@@ -512,28 +565,37 @@ async function processAccount(context, user) {
 
     // Compte déjà réservé → aller directement upload
     if (err.message === 'GOTO_UPLOAD') {
+      logger.info(`[${email}] GOTO_UPLOAD intercepté → upload reçu`);
       try {
-        await stepUploadReceipt(page, email, user);  // ← appelé UNE SEULE FOIS
+        await stepUploadReceipt(page, email, user);
         updateStatus(id, 'pending_confirm');
         logger.success(`[${email}] 📋 Reçu uploadé → pending_confirm`);
         return 'pending_confirm';
       } catch (uploadErr) {
+        if (uploadErr.message === 'UPLOAD_FAILED_RETRY') {
+          logger.warn(`[${email}] Upload échoué 2 fois → remis en waiting_receipt`);
+          updateStatus(id, 'waiting_receipt');
+          return 'waiting_receipt';
+        }
         logger.error(`[${email}] Erreur upload : ${uploadErr.message}`);
-        await screenshot(page, email.replace(/[@.]/g, '_'));
         updateStatus(id, 'failed');
         return 'failed';
       }
     }
 
+    if (err.message === 'UPLOAD_FAILED_RETRY') {
+      logger.warn(`[${email}] Upload échoué 2 fois → remis en waiting_receipt`);
+      updateStatus(id, 'waiting_receipt');
+      return 'waiting_receipt';
+    }
+
     if (err.message === 'INVALID_CREDENTIALS') {
       logger.error(`[${email}] ❌ Identifiants incorrects`);
-      await screenshot(page, `${email.replace(/[@.]/g, '_')}_invalid_creds`);
       updateStatus(id, 'failed');
       return 'invalid_credentials';
     }
 
     logger.error(`[${email}] ❌ Erreur : ${err.message}`);
-    await screenshot(page, email.replace(/[@.]/g, '_'));
     updateStatus(id, 'failed');
     return 'failed';
 

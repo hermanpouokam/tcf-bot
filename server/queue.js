@@ -15,7 +15,7 @@ const { processAccount } = require('./worker');
 const { logger } = require('./logger');
 
 const MAX_WORKERS = 1;
-const AUTO_STOP_THRESHOLD = 3; // no_exam_found consécutifs
+const AUTO_STOP_THRESHOLD = 1000; // no_exam_found consécutifs
 
 let browser = null;
 let browserContext = null;
@@ -55,7 +55,7 @@ async function startBot() {
   queue = [...users];
 
   // Lancer navigateur
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: false });
   browserContext = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/121.0.0.0 Safari/537.36',
