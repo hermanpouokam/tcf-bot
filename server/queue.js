@@ -125,14 +125,6 @@ async function handleWorkerResult(result, user) {
       `[${user.email}] no_exam_found — ${consecutiveNoExam}/${AUTO_STOP_THRESHOLD} consécutifs`
     );
 
-    if (consecutiveNoExam >= AUTO_STOP_THRESHOLD) {
-      logger.error(
-        `Aucun examen trouvé sur ${AUTO_STOP_THRESHOLD} comptes consécutifs. Robot arrêté automatiquement.`
-      );
-      // Vider la file et stopper
-      queue = [];
-      await stopBot();
-    }
   } else {
     // Réinitialiser le compteur si un compte n'est pas no_exam_found
     consecutiveNoExam = 0;
