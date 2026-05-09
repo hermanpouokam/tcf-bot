@@ -6,15 +6,12 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Persistance de la base de données SQLite
-      - ./data:/app/data
-      # Persistance des logs
-      - ./data/logs:/app/logs
+      - /home/ubuntu/tcf-storage/data:/app/data
+      - /home/ubuntu/tcf-storage/logs:/app/logs
     environment:
       - NODE_ENV=production
       - PORT=3000
     # Requis pour Chromium headless dans Docker
     security_opt:
       - seccomp:unconfined
-    # Shared memory augmentée pour éviter les crashs Chromium
     shm_size: 512mb

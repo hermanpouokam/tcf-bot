@@ -47,7 +47,7 @@ COPY . .
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx playwright install chromium --with-deps
 
-RUN mkdir -p data logs screenshots
+RUN mkdir -p data logs 
 
 EXPOSE 3000
 
